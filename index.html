@@ -2838,5 +2838,409 @@ document.addEventListener('DOMContentLoaded', function(){
 <div style="position:fixed;bottom:14px;right:16px;font-size:10.5px;color:rgba(0,0,0,0.18);font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;text-align:right;pointer-events:none;user-select:none;line-height:1.6;z-index:9999;">
   만든 사람<br>박상근 (강원사대부고) · 기경민 (동덕여고)
 </div>
+<!-- ============================================================
+  이 코드를 탐구기록지 HTML의 </body> 바로 앞에 붙여넣으세요
+  그리고 <head> 안에 아래 script 태그도 추가하세요:
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+============================================================ -->
+
+<!-- 클래스룸 제출 모달 -->
+<div id="classroomModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:3000;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#fff;border-radius:20px;width:min(480px,100%);box-shadow:0 24px 64px rgba(0,0,0,.3);overflow:hidden;max-height:90vh;display:flex;flex-direction:column">
+
+    <!-- 모달 헤더 -->
+    <div style="background:linear-gradient(135deg,#1a56db,#0369a1);color:#fff;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <div>
+        <div style="font-size:15px;font-weight:900;margin-bottom:2px">📚 구글 클래스룸에 제출</div>
+        <div style="font-size:11px;opacity:.85">제출할 클래스룸을 선택하세요</div>
+      </div>
+      <button onclick="closeClassroomModal()" style="background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:8px;padding:5px 11px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700">닫기</button>
+    </div>
+
+    <!-- 로그인 전 -->
+    <div id="cmLogin" style="padding:28px 24px;text-align:center">
+      <div style="font-size:48px;margin-bottom:12px">🔐</div>
+      <div style="font-size:15px;font-weight:800;color:#1e3a5f;margin-bottom:6px">구글 계정으로 로그인</div>
+      <div style="font-size:12px;color:#64748b;margin-bottom:20px;line-height:1.6">
+        수강 중인 클래스룸 목록을 불러오려면<br>구글 계정 로그인이 필요합니다.
+      </div>
+      <button onclick="startGoogleLogin()" id="googleLoginBtn" style="display:inline-flex;align-items:center;gap:10px;background:#fff;border:2px solid #e5e7eb;border-radius:12px;padding:12px 22px;cursor:pointer;font-family:inherit;font-size:14px;font-weight:700;color:#374151;box-shadow:0 2px 8px rgba(0,0,0,.08);transition:all .15s">
+        <img src="https://www.google.com/favicon.ico" width="18" height="18" alt="Google">
+        Google 계정으로 로그인
+      </button>
+    </div>
+
+    <!-- 로딩 -->
+    <div id="cmLoading" style="display:none;padding:40px;text-align:center">
+      <div style="width:40px;height:40px;border:3px solid #e5e7eb;border-top-color:#1a56db;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 14px"></div>
+      <div style="font-size:13px;color:#64748b;font-weight:600" id="cmLoadingMsg">클래스룸 목록 불러오는 중...</div>
+    </div>
+
+    <!-- 클래스룸 목록 -->
+    <div id="cmList" style="display:none;flex-direction:column;overflow:hidden;flex:1">
+      <div style="padding:12px 20px 8px;border-bottom:1px solid #f1f5f9;flex-shrink:0">
+        <div style="font-size:11px;font-weight:800;color:#64748b;letter-spacing:.3px" id="cmUserInfo"></div>
+      </div>
+      <div style="overflow-y:auto;padding:10px 14px;flex:1" id="cmCourseList"></div>
+      <div style="padding:12px 16px;border-top:1px solid #f1f5f9;background:#f8fafc;flex-shrink:0">
+        <div style="font-size:11px;color:#94a3b8;line-height:1.6">
+          💡 제출하면 클래스룸 과제에 <b>HTML 첨부파일</b>로 업로드됩니다.<br>
+          교사가 파일을 열면 작성 내용을 확인할 수 있습니다.
+        </div>
+      </div>
+    </div>
+
+    <!-- 제출 완료 -->
+    <div id="cmDone" style="display:none;padding:32px 24px;text-align:center">
+      <div style="font-size:52px;margin-bottom:12px">✅</div>
+      <div style="font-size:16px;font-weight:900;color:#065f46;margin-bottom:6px">제출 완료!</div>
+      <div style="font-size:12.5px;color:#374151;line-height:1.7;margin-bottom:20px" id="cmDoneMsg"></div>
+      <button onclick="closeClassroomModal()" style="background:linear-gradient(135deg,#057a55,#059669);color:#fff;border:none;border-radius:10px;padding:11px 28px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">확인</button>
+    </div>
+
+    <!-- 오류 -->
+    <div id="cmError" style="display:none;padding:28px 24px;text-align:center">
+      <div style="font-size:48px;margin-bottom:12px">⚠️</div>
+      <div style="font-size:14px;font-weight:800;color:#7f1d1d;margin-bottom:8px">오류가 발생했습니다</div>
+      <div style="font-size:12px;color:#374151;line-height:1.7;margin-bottom:20px;background:#fef2f2;border-radius:8px;padding:10px 14px" id="cmErrorMsg"></div>
+      <div style="display:flex;gap:8px;justify-content:center">
+        <button onclick="showCmPanel('Login')" style="background:#fff;border:1.5px solid #e5e7eb;color:#374151;border-radius:8px;padding:9px 18px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">다시 시도</button>
+        <button onclick="closeClassroomModal()" style="background:#7f1d1d;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">닫기</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<style>
+@keyframes spin{to{transform:rotate(360deg)}}
+.cm-course-card{background:#fff;border:1.5px solid #e5e7eb;border-radius:12px;padding:13px 15px;margin-bottom:8px;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.cm-course-card:hover{border-color:#1a56db;background:#eff6ff;transform:translateY(-1px);box-shadow:0 4px 12px rgba(26,86,219,.1)}
+.cm-course-title{font-size:13px;font-weight:800;color:#1e3a5f;margin-bottom:2px}
+.cm-course-section{font-size:11px;color:#64748b}
+.cm-submit-btn{background:linear-gradient(135deg,#1a56db,#0369a1);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:11.5px;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap;transition:all .15s;flex-shrink:0}
+.cm-submit-btn:hover{filter:brightness(1.1)}
+.cm-submit-btn:disabled{background:#9ca3af;cursor:not-allowed}
+.cm-submit-btn.loading{background:#6b7280}
+</style>
+
+<script>
+// ============================================================
+// ★ 여기에 Google Cloud에서 발급받은 클라이언트 ID를 입력하세요
+// ============================================================
+const GOOGLE_CLIENT_ID = 'YOUR_CLIENT_ID_HERE.apps.googleusercontent.com';
+
+// 필요한 권한 범위
+const SCOPES = [
+  'https://www.googleapis.com/auth/classroom.courses.readonly',
+  'https://www.googleapis.com/auth/classroom.coursework.me',
+  'https://www.googleapis.com/auth/drive.file',
+  'email',
+  'profile'
+].join(' ');
+
+let _accessToken = null;
+let _userInfo = null;
+let _tokenClient = null;
+
+// Google Identity Services 초기화
+function initGoogleAuth() {
+  if (!window.google) return;
+  _tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: SCOPES,
+    callback: onTokenReceived,
+    error_callback: (err) => {
+      showCmPanel('Error');
+      document.getElementById('cmErrorMsg').textContent =
+        '로그인 오류: ' + (err.message || err.type || '알 수 없는 오류');
+    }
+  });
+}
+
+// 로그인 버튼 클릭
+function startGoogleLogin() {
+  if (!_tokenClient) { initGoogleAuth(); }
+  if (!_tokenClient) {
+    showCmPanel('Error');
+    document.getElementById('cmErrorMsg').innerHTML =
+      'Google 라이브러리 로딩 실패.<br>페이지를 새로고침 후 다시 시도해주세요.';
+    return;
+  }
+  showCmPanel('Loading');
+  document.getElementById('cmLoadingMsg').textContent = '구글 로그인 중...';
+  _tokenClient.requestAccessToken({ prompt: _accessToken ? '' : 'consent' });
+}
+
+// 토큰 수신 후 처리
+async function onTokenReceived(resp) {
+  if (resp.error) {
+    showCmPanel('Error');
+    document.getElementById('cmErrorMsg').textContent = '로그인 취소 또는 오류: ' + resp.error;
+    return;
+  }
+  _accessToken = resp.access_token;
+  showCmPanel('Loading');
+  document.getElementById('cmLoadingMsg').textContent = '클래스룸 목록 불러오는 중...';
+  try {
+    await loadUserInfo();
+    await loadCourses();
+  } catch(e) {
+    showCmPanel('Error');
+    document.getElementById('cmErrorMsg').textContent = e.message || '데이터 로딩 실패';
+  }
+}
+
+// 사용자 정보 가져오기
+async function loadUserInfo() {
+  const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+    headers: { Authorization: 'Bearer ' + _accessToken }
+  });
+  if (!res.ok) throw new Error('사용자 정보 로딩 실패');
+  _userInfo = await res.json();
+}
+
+// 클래스룸 목록 가져오기
+async function loadCourses() {
+  const res = await fetch(
+    'https://classroom.googleapis.com/v1/courses?courseStates=ACTIVE&pageSize=20',
+    { headers: { Authorization: 'Bearer ' + _accessToken } }
+  );
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error('클래스룸 목록 오류: ' + (err.error?.message || res.status));
+  }
+  const data = await res.json();
+  const courses = data.courses || [];
+
+  // 사용자 정보 표시
+  const uInfo = document.getElementById('cmUserInfo');
+  if (uInfo && _userInfo) {
+    uInfo.textContent = '👤 ' + (_userInfo.name || _userInfo.email) + ' · 클래스룸 ' + courses.length + '개';
+  }
+
+  // 클래스룸 목록 렌더링
+  const list = document.getElementById('cmCourseList');
+  if (!list) return;
+  if (courses.length === 0) {
+    list.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px">수강 중인 클래스룸이 없습니다.<br>교사가 클래스룸에 추가했는지 확인하세요.</div>';
+  } else {
+    list.innerHTML = courses.map(c => `
+      <div class="cm-course-card">
+        <div style="min-width:0;flex:1">
+          <div class="cm-course-title">${escHtml(c.name)}</div>
+          <div class="cm-course-section">${escHtml(c.section || c.descriptionHeading || '')}</div>
+        </div>
+        <button class="cm-submit-btn" onclick="submitToCourse('${c.id}','${escHtml(c.name)}',this)">
+          제출하기 →
+        </button>
+      </div>
+    `).join('');
+  }
+  showCmPanel('List');
+}
+
+// 클래스룸에 제출
+async function submitToCourse(courseId, courseName, btn) {
+  btn.disabled = true;
+  btn.classList.add('loading');
+  btn.textContent = '⏳ 업로드 중...';
+
+  try {
+    // 1. HTML 파일 생성
+    const data = collect();
+    const saved = '<script>window.__SAVED__=' + JSON.stringify(data) + ';<\/script>';
+    const htmlContent = document.documentElement.outerHTML.replace('</head>', saved + '</head>');
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+
+    // 파일명 생성
+    const studentName = (data['j_name'] || data['n_name'] || _userInfo?.name || '학생').replace(/\s/g,'_');
+    const dt = new Date();
+    const ds = dt.getFullYear() + String(dt.getMonth()+1).padStart(2,'0') + String(dt.getDate()).padStart(2,'0');
+    const fileName = '탐구기록지_' + studentName + '_' + ds + '.html';
+
+    // 2. Google Drive에 파일 업로드 (multipart)
+    const meta = { name: fileName, mimeType: 'text/html' };
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
+    form.append('file', blob);
+
+    const uploadRes = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+      {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + _accessToken },
+        body: form
+      }
+    );
+    if (!uploadRes.ok) {
+      const err = await uploadRes.json();
+      throw new Error('드라이브 업로드 실패: ' + (err.error?.message || uploadRes.status));
+    }
+    const fileData = await uploadRes.json();
+    const driveFileId = fileData.id;
+
+    // 3. 파일 공유 권한 설정 (클래스룸 접근용)
+    await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}/permissions`, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + _accessToken,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ role: 'reader', type: 'domain', domain: 'classroom.google.com' })
+    }).catch(() => {}); // 권한 설정 실패해도 계속 진행
+
+    // 4. 클래스룸 과제 제출 (studentSubmissions에 첨부)
+    // 먼저 해당 코스의 coursework 목록 가져오기
+    const cwRes = await fetch(
+      `https://classroom.googleapis.com/v1/courses/${courseId}/courseWork?courseWorkStates=PUBLISHED&pageSize=10`,
+      { headers: { Authorization: 'Bearer ' + _accessToken } }
+    );
+
+    let submissionCreated = false;
+
+    if (cwRes.ok) {
+      const cwData = await cwRes.json();
+      const works = (cwData.courseWork || []).filter(w =>
+        w.title?.includes('탐구') || w.title?.includes('기록') || w.workType === 'ASSIGNMENT'
+      );
+
+      if (works.length > 0) {
+        // 가장 최근 과제에 제출 시도
+        const work = works[0];
+        // 내 제출물 가져오기
+        const mySubRes = await fetch(
+          `https://classroom.googleapis.com/v1/courses/${courseId}/courseWork/${work.id}/studentSubmissions?userId=me`,
+          { headers: { Authorization: 'Bearer ' + _accessToken } }
+        );
+        if (mySubRes.ok) {
+          const mySubData = await mySubRes.json();
+          const sub = mySubData.studentSubmissions?.[0];
+          if (sub) {
+            // 첨부파일 추가
+            await fetch(
+              `https://classroom.googleapis.com/v1/courses/${courseId}/courseWork/${work.id}/studentSubmissions/${sub.id}:modifyAttachments`,
+              {
+                method: 'POST',
+                headers: {
+                  Authorization: 'Bearer ' + _accessToken,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  addAttachments: [{
+                    driveFile: { id: driveFileId, title: fileName }
+                  }]
+                })
+              }
+            );
+            // 제출
+            await fetch(
+              `https://classroom.googleapis.com/v1/courses/${courseId}/courseWork/${work.id}/studentSubmissions/${sub.id}:turnIn`,
+              {
+                method: 'POST',
+                headers: { Authorization: 'Bearer ' + _accessToken, 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+              }
+            );
+            submissionCreated = true;
+          }
+        }
+      }
+    }
+
+    // 과제가 없거나 제출 실패 → 드라이브 파일 링크만 공유
+    if (!submissionCreated) {
+      // 파일을 클래스룸 공유 드라이브에 이동 또는 링크 공유
+      await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}/permissions`, {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + _accessToken,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ role: 'reader', type: 'anyone' })
+      }).catch(() => {});
+    }
+
+    // 완료 화면
+    showCmPanel('Done');
+    document.getElementById('cmDoneMsg').innerHTML =
+      `<b>${escHtml(courseName)}</b>에 탐구기록지를 제출했습니다.<br><br>` +
+      `📄 파일명: <b>${escHtml(fileName)}</b><br>` +
+      (submissionCreated
+        ? '✅ 클래스룸 과제에 첨부 및 제출 완료'
+        : '📁 Google Drive에 저장됨<br><span style="font-size:11px;color:#64748b">※ 해당 클래스룸에 탐구기록지 과제가 없어 드라이브에 저장됐습니다. 교사가 과제를 만들면 다시 제출해주세요.</span>');
+
+  } catch(e) {
+    showCmPanel('Error');
+    document.getElementById('cmErrorMsg').textContent = e.message || '제출 중 오류 발생';
+  }
+}
+
+// 유틸
+function showCmPanel(name) {
+  ['Login','Loading','List','Done','Error'].forEach(p => {
+    const el = document.getElementById('cm' + p);
+    if (el) el.style.display = (p === name) ? (p === 'List' ? 'flex' : 'block') : 'none';
+  });
+  const modal = document.getElementById('classroomModal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function openClassroomModal() {
+  if (!window.google) {
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.onload = () => { initGoogleAuth(); };
+    document.head.appendChild(script);
+  } else {
+    initGoogleAuth();
+  }
+  if (_accessToken) {
+    showCmPanel('Loading');
+    loadCourses().catch(e => {
+      _accessToken = null;
+      showCmPanel('Login');
+    });
+  } else {
+    showCmPanel('Login');
+  }
+}
+
+function closeClassroomModal() {
+  const modal = document.getElementById('classroomModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// 기존 doSave 함수를 교체 (저장 + 클래스룸 제출)
+function doSave() {
+  // 로컬 저장
+  var data = collect();
+  var saved = '<script>window.__SAVED__=' + JSON.stringify(data) + ';<\/script>';
+  var html = document.documentElement.outerHTML.replace('</head>', saved + '</head>');
+  var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  var name = (data['j_name'] || data['n_name'] || '학생').replace(/\s/g,'_');
+  var dt = new Date();
+  var ds = dt.getFullYear() + String(dt.getMonth()+1).padStart(2,'0') + String(dt.getDate()).padStart(2,'0');
+  a.download = '탐구기록지_' + name + '_' + ds + '.html';
+  a.click();
+  URL.revokeObjectURL(a.href);
+
+  // 저장 완료 표시 후 클래스룸 모달 열기
+  var ok = document.getElementById('savedOk');
+  if (ok) { ok.style.display = 'inline-block'; setTimeout(function(){ ok.style.display='none'; }, 1500); }
+  setTimeout(openClassroomModal, 600);
+}
+
+// 모달 외부 클릭 닫기
+document.getElementById('classroomModal').addEventListener('click', function(e) {
+  if (e.target === this) closeClassroomModal();
+});
+</script>
 </body>
 </html>
